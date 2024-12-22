@@ -1,6 +1,6 @@
 ---
 title: "Project_MATH564"
-author: "Meghana,Jagadeeswar & Deepakshi"
+author: "Meghana Thimmaiah"
 date: "2024-11-12"
 output: html_document
 ---

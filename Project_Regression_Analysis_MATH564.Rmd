@@ -1,0 +1,455 @@
+---
+title: "Project_MATH564"
+author: "Meghana,Jagadeeswar & Deepakshi"
+date: "2024-11-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+#Regression Analysis of California Housing Prices
+
+# Introduction
+```{r}
+# Load necessary libraries
+library(readxl)
+library(car)
+library(lmtest)
+library(ggplot2)
+library(dplyr)
+
+# Load the dataset
+data <- read_excel("C:/Users/megha/Sem2/Regression/Project/New Folder/housing.xlsx")
+
+# View the structure and summary of the data
+str(data)
+summary(data)
+
+```
+
+##Step 1: Data Exploration and Cleaning
+
+
+```{r}
+# Check for missing values
+colSums(is.na(data))
+
+# Optionally, handle missing values if necessary
+data <- na.omit(data)
+
+# Convert the 'ocean_proximity' column to a factor
+data$ocean_proximity <- as.factor(data$ocean_proximity)
+
+# Summary statistics after cleaning
+summary(data)
+
+```
+##Step 2: Define Response and Predictor Variables
+Response Variable: median_house_value (assuming the goal is to predict house value).
+Predictors: Including median_income, housing_median_age, total_rooms, and ocean_proximity to assess their effects on the response.
+
+```{r}
+# Define the response and predictor variables
+response <- "median_house_value"
+predictors <- c("median_income", "housing_median_age", "total_rooms", "ocean_proximity")
+
+# Define the regression formula
+formula <- as.formula(paste(response, "~", paste(predictors, collapse = " + ")))
+```
+
+##Step 3: Fit Initial Regression Model
+
+```{r}
+# Fit the initial regression model
+model <- lm(formula, data = data)
+summary(model)
+```
+
+##Step 4: Durbin-Watson Test
+```{r}
+# Load necessary library
+library(lmtest)
+
+# Perform the Durbin-Watson test
+dw_test_result <- dwtest(model)
+dw_test_result
+```
+
+Durbin-Watson Statistic (DW): 0.82531 (far below 2), which suggests positive autocorrelation in the residuals.
+p-value: < 2.2e-16, which is highly significant, indicating strong evidence against the null hypothesis (of no autocorrelation). Thus, we reject the null hypothesis and conclude that autocorrelation is present.
+
+
+Since the Durbin-Watson test revealed positive autocorrelation, So we are addressing this issue to improve the reliability of the model.
+To address the autocorrelation detected in the Durbin-Watson test, a lagged variable `lag_median_house_value` is added to the model.
+
+##Step 5: Add Lagged Variables to Address Autocorrelation
+```{r}
+# Create a lagged version of median_house_value as a predictor
+data$lag_median_house_value <- c(NA, head(data$median_house_value, -1))
+
+# Re-fit the model, including the lagged variable
+model_lag <- lm(median_house_value ~ median_income + housing_median_age + total_rooms + ocean_proximity + lag_median_house_value, data = data, na.action = na.exclude)
+summary(model_lag)
+```
+After modifying the model with the lagged variable,we rerun the Durbin-Watson test to check if autocorrelation has been reduced.
+
+##Step 6: Conduct the Durbin-Watson Test Again
+
+```{r}
+# Re-run the Durbin-Watson test on the new model
+dw_test_result_lag <- dwtest(model_lag)
+dw_test_result_lag
+```
+
+**Interpretation**:
+- The Durbin-Watson statistic of 2.1791 is close to 2, indicating that autocorrelation in the residuals has been reduced.
+- The high p-value (p = 1) suggests there is no significant autocorrelation remaining, confirming that the inclusion of the lagged variable successfully addressed this issue.
+
+### Final Model Selection
+
+Based on this result, the modified model with the lagged variable is selected as the final model, as it improves model reliability by addressing autocorrelation.
+
+
+
+##Step 7: Refit the Initial Model on the Same Data as model_lag
+```{r}
+# Refit the initial model excluding the first row
+model_refit <- lm(median_house_value ~ median_income + housing_median_age + total_rooms + ocean_proximity, 
+                  data = data[-1, ])
+```
+
+##Step 8: Model Comparison and Selection
+To select the best-fitting model, we compare the AIC values of the initial and modified models (with the lagged variable). Lower AIC values indicate a better fit, considering model complexity and accuracy.
+
+```{r}
+# Compare the AIC values of the models
+AIC(model_refit, model_lag)
+
+```
+
+The model with the lagged variable (`model_lag`) has a lower AIC, indicating a better fit with a reasonable model complexity.
+
+**Interpretation of Predictors**:
+  - `median_income` and `housing_median_age` are significant positive predictors.
+  - The categorical variable `ocean_proximity` shows different levels of impact on `median_house_value`.
+  - The lagged term for `median_house_value` suggests that past values significantly influence current housing prices.
+  
+##Step 9: Diagnostic Checks on Final Model
+
+To ensure the model assumptions are met (such as normality, homoscedasticity, and independence), we are performing diagnostic checks on model_lag.
+
+```{r}
+# Residual vs Fitted plot
+plot(model_lag, which = 1)  # Checks for linearity and homoscedasticity
+
+# Normal Q-Q plot
+plot(model_lag, which = 2)  # Checks for normality of residuals
+
+# Scale-Location plot
+plot(model_lag, which = 3)  # Checks for homoscedasticity
+
+# Residuals vs Leverage plot
+plot(model_lag, which = 5)  # Identifies influential points
+```
+
+Diagnostic Analysis of Model Assumptions
+The following diagnostic plots were generated to assess the assumptions of the regression model and identifying any potential issues that may impact the reliability of the results:
+1.	Residuals vs. Fitted Plot:
+o	This plot is used to check for non-linearity and heteroscedasticity in the residuals. A random scatter around the zero line indicates that the model's assumptions are met. However, any systematic pattern (e.g., a funnel shape) suggests heteroscedasticity.
+o	In our model, the plot reveals a noticeable pattern, suggesting potential issues with non-linearity and heteroscedasticity. This pattern indicates that the variability of the residuals changes across the range of fitted values, which may affect the accuracy of the p-values and standard errors.
+2.	Q-Q Plot of Residuals:
+o	The Q-Q plot assesses the normality of residuals. If the residuals are normally distributed, they should follow a straight line on this plot.
+o	Our Q-Q plot shows deviations from the straight line, especially at the tails, suggesting that the residuals are not perfectly normal. While minor deviations are generally acceptable, significant deviations indicate that normality assumptions may not hold, which could impact the reliability of hypothesis testing in our model.
+3.	Scale-Location Plot:
+o	This plot checks for homoscedasticity (constant variance of residuals) across fitted values. Ideally, the points should be spread randomly without a discernible pattern.
+o	In this plot, the residual spread appears to increase with fitted values, which indicates heteroscedasticity. This issue implies that the residuals do not have a constant variance, potentially affecting the model’s ability to provide accurate confidence intervals and p-values.
+4.	Residuals vs. Leverage Plot:
+o	This plot helps identify influential observations that could disproportionately affect the model's fit. Points with high leverage (high Cook's distance) should be reviewed to determine if they unduly influence the model.
+o	In our case, we observe a few data points with high leverage, suggesting that some observations may significantly impact the model's predictions. Investigating these points further could improve model robustness.
+
+
+Summary of Diagnostic Findings:
+The diagnostic plots indicate several potential issues:
+•	Non-linearity: The residuals vs. fitted plot suggests a non-linear relationship that the current linear model may not fully capture.
+•	Heteroscedasticity: Both the residuals vs. fitted plot and scale-location plot indicate heteroscedasticity, which affects the accuracy of standard errors and hypothesis tests.
+•	Non-Normality of Residuals: The Q-Q plot suggests that residuals deviate from normality, particularly in the tails.
+•	Influential Observations: The residuals vs. leverage plot highlights a few points with high leverage, which could skew model results.
+Based on these findings, further remediation steps will be taken to address these issues, including transformations to handle heteroscedasticity and adjustments for influential observations. These steps will improve the model's reliability and ensure it meets regression assumptions for better interpretation and predictive performance.
+
+##Step 10: Addressing Heteroscedasticity
+To address heteroscedasticity, we can start by applying a log transformation to the response variable, median_house_value.
+```{r}
+# Apply a log transformation to the response variable
+data$log_median_house_value <- log(data$median_house_value)
+
+# Fit a new regression model with the transformed response variable
+model_log <- lm(log_median_house_value ~ median_income + housing_median_age + total_rooms + ocean_proximity, data = data)
+summary(model_log)
+
+# Check residual plots again to see if heteroscedasticity has improved
+par(mfrow = c(2, 2))
+plot(model_log)
+```
+After transforming the response variable median_house_value with a logarithmic scale, we observe the following key relationships between predictors and housing prices:
+
+median_income (Estimate = 0.1653): The coefficient for median_income suggests a strong positive association with housing prices. Specifically, for each unit increase in median_income, the expected log_median_house_value increases by 0.1653, which translates to an approximate 18% increase in median house price on the original scale. This finding highlights that higher-income areas tend to have substantially higher housing prices.
+
+housing_median_age (Estimate = 0.0030): The positive relationship between housing_median_age and housing prices is weaker but still significant. A one-year increase in median housing age is associated with a 0.3% increase in median house price, indicating that older neighborhoods may have slightly higher prices.
+
+total_rooms (Estimate = 2.088e-05): The small positive coefficient for total_rooms indicates a modest increase in housing price with an increase in the total number of rooms. However, its effect size is much smaller compared to median_income.
+
+ocean_proximity (various levels): The categorical variable ocean_proximity shows that areas closer to the ocean have higher housing prices compared to inland areas. For example, properties "NEAR OCEAN" have an estimated 3.78% higher housing price than those inland, reflecting the added value of ocean proximity.
+
+Residuals vs Fitted Plot:
+The spread of residuals is more uniform across fitted values compared to the original model. This indicates an improvement in addressing heteroscedasticity, as the residuals no longer exhibit a strong pattern or fan shape, suggesting that the variance of residuals is now more consistent.
+
+Q-Q Plot:
+The Q-Q plot shows that residuals follow a roughly linear pattern along the theoretical quantiles, particularly in the middle range. This indicates that the residuals are approximately normally distributed, although there are some deviations at the tails. Overall, normality has improved, which supports the assumption of normally distributed errors.
+
+Scale-Location Plot:
+In this plot, the residuals are more evenly distributed along the fitted values, and the red line is relatively flat, further supporting that heteroscedasticity has been mitigated. The transformation has helped to stabilize variance, as the residuals now show a more constant spread.
+
+Residuals vs Leverage Plot:
+This plot identifies influential points that may disproportionately impact the model. While a few points show higher leverage, they do not appear to be unduly influencing the model, as indicated by their position relative to Cook’s distance lines. This suggests that the model’s fit is not overly reliant on these data points.
+
+
+##Step 11: Checking for Multicollinearity
+
+To assess multicollinearity, we can calculate the Variance Inflation Factor (VIF) for each predictor.
+
+```{r}
+# Load car package if not already loaded
+library(car)
+
+# Calculate VIF for the predictors in the transformed model
+vif_values <- vif(model_lag)
+vif_values
+```
+
+The VIF values for each predictor in the transformed model are as follows:
+
+median_income: VIF = 1.27
+housing_median_age: VIF = 1.15
+total_rooms: VIF = 1.09
+ocean_proximity: VIF = 1.05
+lag_median_house_value: VIF = 1.39
+Since all VIF values are below the commonly used threshold of 5 (and even well below a stricter threshold of 10), multicollinearity does not appear to be a concern in this model. Each predictor contributes independent information, and there is minimal redundancy among the predictors. This suggests that the model coefficients can be reliably interpreted without risk of inflated standard errors due to multicollinearity.
+
+Conclusion: No further action is needed to address multicollinearity in this model. We can proceed with the interpretation of predictors and other diagnostic checks, confident that the predictor variables are not excessively correlated.
+
+
+##Step 12: Identifying Influential Points
+After checking for multicollinearity, it's essential to assess whether certain observations exert an outsized influence on the regression model. This is important because influential points, if not identified and addressed, can disproportionately affect the model's coefficients and reduce its predictive accuracy.
+
+Why Identifying Influential Points is Necessary
+Influential points are observations in the dataset that have a substantial impact on the estimation of regression coefficients. They can arise due to outliers or unique data points that differ significantly from the rest of the dataset. By identifying these points, we can determine if they are unduly affecting the model’s results. If influential points are present, we may need to investigate them further, potentially refining the model or addressing these points individually to improve overall model robustness.
+
+Approach to Identifying Influential Points
+To detect influential points, we use Cook’s Distance, which measures the influence of each observation by quantifying the change in regression coefficients when that observation is removed. Observations with a high Cook’s Distance (commonly above the threshold (4/n),where 𝑛is the number of observations) are flagged as influential.
+
+In the following code, we calculate and plot Cook’s Distance to visualize influential points and list the specific observations with Cook’s Distance values above the threshold.
+
+```{r}
+# Calculate Cook's Distance for the final model (e.g., model_log)
+cooks_distances <- cooks.distance(model_log)
+
+# Plot Cook's Distance to visually identify influential points
+plot(cooks_distances, type = "h", main = "Cook's Distance for Influential Points", ylab = "Cook's Distance")
+abline(h = 4 / length(cooks_distances), col = "red", lty = 2)  # Threshold line
+
+# Identify points with high Cook's Distance
+influential_points <- which(cooks_distances > 4 / length(cooks_distances))
+influential_points
+```
+
+Summary of Influential Points:
+Cook's Distance Plot:
+The plot shows the Cook's Distance values for each observation, which helps identify influential data points that could have a disproportionate effect on the model's parameters.
+A few points have relatively high Cook's Distance values compared to the majority, suggesting they could be influential in altering the regression model's results.
+The threshold for influence is generally considered to be observations with a Cook's Distance greater than 4/n, where n is the number of observations. In this plot, certain observations exceed this threshold.
+
+List of Influential Points:
+The identified influential points have been listed, indicating indices where the Cook's Distance is significantly higher than others.
+These influential points may represent unusual cases, outliers, or data points that exert significant leverage on the model.
+
+
+
+##Step 13: Remediation and Final Model Adjustments
+
+After identifying influential points, it’s important to evaluate their impact on our regression model. Influential points, as identified by Cook's Distance, may skew the regression results by having an outsized effect on the estimated coefficients. Here, we will examine the influence of these points and determine if any action, such as removing them, is warranted.
+
+Why Remediation is Necessary:
+Influential points can disproportionately impact the model, potentially leading to biased estimates and affecting the reliability of predictions. By addressing these points, we aim to improve the model’s robustness and ensure that the estimates reflect general trends rather than being skewed by outliers or unique cases.
+
+Approach to Remediation:
+Inspect Influential Points: Review the identified influential points to determine if they represent genuine data variations, unusual cases, or possible data entry errors.
+Decide on Adjustment:
+If the influential points appear to represent genuine observations with valuable information, they should remain in the model.
+If they are extreme outliers or data entry errors that may distort the overall model, consider excluding them.
+Refit the Model Without Influential Points: If certain influential points are removed, we can refit the model on the cleaned dataset and compare the results.
+
+
+Code for Model Refit Without Influential Points
+In this case, we proceed by removing the influential points identified by Cook's Distance and refitting the model to assess any changes in parameter estimates and model fit.
+
+```{r}
+# Remove influential points and refit the model
+data_cleaned <- data[-influential_points, ]
+
+# Refit the model on the cleaned data
+model_cleaned <- lm(log_median_house_value ~ median_income + housing_median_age + total_rooms + ocean_proximity, data = data_cleaned)
+summary(model_cleaned)
+
+# Compare AIC values for the original and cleaned models
+AIC(model_log, model_cleaned)
+```
+Interpretation of Regression Model Results
+
+Coefficients Interpretation:
+
+Intercept: The intercept is estimated at 11.36, which represents the log-transformed baseline median house value when all predictors are zero.
+median_income: The coefficient for median_income is 1.828, indicating a strong positive association. This means that for each unit increase in median income, the log of the median house value increases by approximately 1.828, holding other variables constant.
+housing_median_age: The coefficient for housing_median_age is 0.346, suggesting that older housing age is associated with a higher median house value, albeit to a lesser extent compared to income.
+total_rooms: The coefficient for total_rooms is 0.000025, showing a small positive relationship between the number of rooms and median house value.
+ocean_proximity (categorical):
+The INLAND category has a large negative coefficient (-5.019), implying that homes located inland are associated with a significantly lower log-transformed house value compared to the baseline category.
+The NEAR OCEAN category has a positive coefficient (5.629), showing a significant increase in house value for properties near the ocean.
+
+Model Fit and Significance:
+
+R-squared: The model's R-squared is 0.6976, meaning approximately 69.76% of the variance in the log-transformed median house value is explained by the predictors. This indicates a reasonably good fit.
+Adjusted R-squared: The adjusted R-squared of 0.6975 further validates the model’s strength in explaining the variability.
+F-statistic: The F-statistic is significant (p < 2.2e-16), showing that the overall model is statistically significant.
+
+AIC Comparison:
+
+AIC for model_log: 15134.362
+AIC for model_cleaned: 8406.129
+The model_cleaned has a significantly lower AIC value compared to model_log, indicating that the refined model provides a better fit to the data with a more parsimonious structure. A lower AIC suggests that model_cleaned is preferable as it achieves a good balance between model fit and complexity.
+
+Conclusion:
+The regression model indicates that median_income and proximity to the ocean are significant positive predictors of median house value, while inland location negatively affects house values. The improvement in AIC for model_cleaned suggests that this model is a more optimal choice for prediction or inference in this dataset.
+
+
+##Step 14: Final Diagnostic Checks and Conclusion
+After refining our model by removing influential points and comparing the AIC values, we have achieved a model with improved fit and stability. To ensure the final model meets all the assumptions of linear regression, we perform one last round of diagnostic checks.
+
+Rationale for Final Diagnostic Checks
+The final diagnostic checks will help confirm that the refined model (model_cleaned) adheres to the assumptions of linear regression, such as linearity, homoscedasticity, normality of residuals, and lack of autocorrelation. If these assumptions are satisfied, we can be more confident in the validity and reliability of our model for inference or prediction.
+
+Code for Final Diagnostic Checks
+
+```{r}
+# Final diagnostic plots for the refined model
+par(mfrow = c(2, 2))
+
+# Residual vs Fitted plot for linearity and homoscedasticity
+plot(model_cleaned, which = 1, main = "Residuals vs Fitted (model_cleaned)")
+
+# Q-Q plot for normality of residuals
+plot(model_cleaned, which = 2, main = "Normal Q-Q Plot (model_cleaned)")
+
+# Scale-Location plot for homoscedasticity
+plot(model_cleaned, which = 3, main = "Scale-Location Plot (model_cleaned)")
+
+# Residuals vs Leverage plot to check for influential points
+plot(model_cleaned, which = 5, main = "Residuals vs Leverage (model_cleaned)")
+```
+Interpretation of Final Diagnostic Plots for model_cleaned
+The final diagnostic plots for model_cleaned provide insights into the model's adherence to the assumptions of linear regression, including linearity, homoscedasticity, normality of residuals, and influence of specific points. Here’s a detailed interpretation of each plot:
+
+Residuals vs Fitted Plot:
+
+This plot checks for linearity and homoscedasticity. Ideally, the residuals should be randomly scattered around the horizontal line at zero, without any discernible pattern.
+In this case, the residuals show some funneling or spreading as fitted values increase, indicating potential heteroscedasticity (non-constant variance).
+Although the residuals generally hover around zero, the slight funneling suggests that while the log transformation improved the model, there might still be minor issues with heteroscedasticity.
+
+Normal Q-Q Plot:
+This plot assesses the normality of residuals. If the residuals follow a normal distribution, they should align closely with the diagonal reference line.
+Here, the residuals deviate from the line, especially at the tails, indicating that the residuals are not perfectly normal.
+Although some deviation is acceptable, especially in large datasets, the tails suggest mild departures from normality, which might slightly impact statistical inference.
+
+Scale-Location Plot:
+This plot provides another check for homoscedasticity. A flat red line and an even distribution of residuals along the range of fitted values would indicate constant variance.
+In our model, the red line is relatively flat, but there is a slight trend where residuals become more spread out as fitted values increase.
+This pattern supports the findings from the Residuals vs Fitted plot, hinting at minor heteroscedasticity. However, the deviation isn’t extreme, so it’s likely that the log transformation has largely addressed this issue.
+
+Residuals vs Leverage Plot:
+This plot identifies influential points. Observations with high leverage or those outside the Cook’s distance lines may disproportionately impact the model.
+In this plot, a few points are close to the Cook's distance line, indicating that these observations have some influence on the model. However, they don’t appear to be highly problematic as they are within acceptable ranges.
+Given the adjustments already made to remove influential points, the remaining data points seem to exert minimal undue influence on the model.
+
+Summary of Diagnostic Analysis:
+The final diagnostic checks for model_cleaned indicate that the model is reasonably well-behaved:
+
+Linearity and Homoscedasticity: While minor heteroscedasticity remains, the log transformation effectively reduced this issue. The patterns observed do not seem severe enough to significantly impact model validity.
+Normality: The Q-Q plot shows some deviation from normality in the tails, which may slightly affect the accuracy of p-values and confidence intervals. However, this deviation is not extreme.
+Influence: The leverage plot reveals that no points exert excessive influence, suggesting that the model is robust against individual outliers.
+
+Overall, these diagnostics suggest that model_cleaned is a reliable model for predicting the log-transformed median house value, with only minor deviations from ideal assumptions.
+
+
+
+##Step 15: Summary of Key Findings and Conclusions:
+
+The analysis of the housing dataset using multiple linear regression has provided significant insights into the factors influencing median_house_value. After refining the model to address issues of autocorrelation, heteroscedasticity, and influential points, we have arrived at a more robust and interpretable model. Below is a summary of the key findings:
+
+Significant Predictors
+Median Income: This is the strongest predictor of median_house_value. With a positive coefficient, median income shows a substantial impact on housing prices, indicating that as income levels rise, so does the median house value. Each unit increase in median_income corresponds to approximately an 18% increase in median house value on the original scale, underscoring the importance of income levels in housing valuation.
+
+Housing Median Age: Housing age also has a positive association with house prices. For each additional year in housing age, there is a slight increase in median house value, suggesting that older neighborhoods may carry a premium, possibly due to established infrastructure or desirable locations.
+
+Total Rooms: This variable shows a positive but smaller effect on housing prices. Each additional room corresponds to a modest increase in house value, supporting the idea that larger homes are valued higher.
+
+Ocean Proximity: The categorical variable ocean_proximity has varying effects on house prices:
+
+Inland properties: These properties have significantly lower house values compared to the baseline (which is proximity to the bay), with a large negative coefficient.
+Properties near the ocean: These homes show a significant positive impact on house prices, suggesting that proximity to the ocean is a valued feature.
+Model Performance and Fit
+The final model, model_cleaned, has an adjusted R-squared value of approximately 0.6975, indicating that around 69.75% of the variance in median_house_value is explained by the predictors in the model. This is a reasonably good fit for a regression model in real estate, where other unobserved factors (like neighborhood characteristics) can also play a role in housing prices.
+
+The comparison of AIC values between the initial and final models showed a substantial decrease after removing influential points and refining the model. The final model’s lower AIC value suggests it provides a better fit without adding unnecessary complexity.
+
+Addressing Model Assumptions
+Throughout the analysis, various diagnostic checks were performed to ensure that the assumptions of linear regression were reasonably met:
+
+Linearity and Homoscedasticity: While slight heteroscedasticity remains, the log transformation on the response variable significantly reduced this issue. The Residuals vs Fitted plot shows a reasonably uniform spread around zero.
+Normality of Residuals: The Q-Q plot shows some deviations from normality at the tails, but these are not extreme. Given the dataset size, these deviations are considered minor and unlikely to affect the overall validity of the model.
+Influence of Outliers: After removing points with high Cook’s Distance, the model is less affected by extreme outliers, increasing the reliability of the estimated coefficients.
+
+
+##Step 16: Practical Implications and Recommendations
+
+Based on the analysis, we can draw practical conclusions that may benefit stakeholders in the housing market, such as real estate investors, developers, and policymakers.
+
+Income-Driven Investment: Areas with higher median incomes are associated with significantly higher house values. Investors and developers might focus on such neighborhoods for high-value developments.
+
+Desirability of Ocean Proximity: Proximity to the ocean is a major positive factor for house values. Properties near the ocean or bay are likely to attract higher prices. This finding could guide developers and investors when choosing locations for luxury or premium housing projects.
+
+Older, Established Neighborhoods: The positive coefficient for housing age suggests that some buyers might value the established character of older neighborhoods. However, this effect is modest compared to income and proximity factors.
+
+Recommendations for Pricing and Valuation: Real estate professionals can use these insights to better price properties. Inland properties, for instance, should be valued lower than those near the ocean or bay, even after accounting for room size and age.
+
+Limitations and Future Research
+Residual Heteroscedasticity: While the log transformation helped address non-constant variance, slight heteroscedasticity remains. Future analyses could explore alternative transformations or more complex models like generalized least squares (GLS) that account for this issue.
+Non-Normal Residuals: Mild deviations from normality in the residuals might suggest that further refinements or alternative models (e.g., robust regression) could be explored.
+Unobserved Predictors: Factors like crime rates, school quality, and proximity to amenities were not included in this analysis. Future research could incorporate these variables for potentially improved predictions.
+
+This analysis provided a comprehensive examination of the factors influencing housing prices in the dataset, focusing on identifying and mitigating model issues to improve reliability and interpretability. By addressing autocorrelation, influential points, and heteroscedasticity, we arrived at a robust model that reveals valuable insights into the housing market.
+
+Key Conclusions:
+
+Median income and proximity to the ocean are strong positive predictors of housing prices, highlighting the impact of economic and geographical factors on property values.
+Housing age and total rooms also contribute positively, albeit to a lesser extent, indicating that older and larger homes hold value in certain regions.
+The refined model, with a high adjusted R-squared and lower AIC, demonstrates an improved fit and balance between complexity and accuracy, making it suitable for predictive and inferential purposes.

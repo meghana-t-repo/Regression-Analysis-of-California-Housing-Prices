@@ -21,17 +21,20 @@ install.packages(c("ggplot2", "car"))
 Load the dataset and execute the R scripts for analysis.
 
 How to RUN 🕹️
+
 Load the dataset in RStudio.
 Execute the script Project_Regression_Analysis_MATH564
 View results and plots in the output folder.
 
 Visualizations 📈
+
 Residual vs. Fitted Plot: Diagnostic for heteroscedasticity.
 Cook's Distance Plot: Highlights influential points.
 Adjusted R² Improvements: Bar chart comparing initial and refined models.
 Median Income vs. Housing Prices: Scatter plot with regression line.
 
 Credits 🙌
+
 This project was completed as part of the MATH 564: Regression Analysis course at Illinois Institute of Technology.
 Guidance from Prof. Kia Ong was instrumental in understanding regression diagnostics and model refinement techniques.
 The dataset was sourced from the California Housing Prices Dataset on Kaggle, which provided a comprehensive basis for my analysis.

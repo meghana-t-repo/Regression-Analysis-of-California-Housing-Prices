@@ -1,4 +1,5 @@
 California Housing Prices Regression Analysis 🏡 📊
+
 Analyzing housing prices in California to identify key factors like median income, housing age, and proximity to the ocean. This project uses advanced regression techniques to improve model accuracy and provide actionable insights.
 
 Project Description 🔍
@@ -21,7 +22,7 @@ Load the dataset and execute the R scripts for analysis.
 
 How to RUN 🕹️
 Load the dataset in RStudio.
-Execute the script housing_Regression_Analysis_MATH564.Rmd
+Execute the script Project_Regression_Analysis_MATH564
 View results and plots in the output folder.
 
 Visualizations 📈
